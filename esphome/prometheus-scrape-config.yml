@@ -1,0 +1,22 @@
+# Example scrape_configs block for prometheus.yml.
+# Each ESP32 node is its own target and is tagged per sub-board.
+#
+# ESPHome's prometheus component serves metrics at http://<node>/metrics on
+# port 80. Use static IPs (or DHCP reservations) in production; the .local
+# mDNS names below work if your Prometheus host can resolve mDNS.
+
+scrape_configs:
+  - job_name: kamstrup
+    metrics_path: /metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["kamstrup-uc1.local:80"]
+        labels: { meter: "UC1" }
+      - targets: ["kamstrup-uc2.local:80"]
+        labels: { meter: "UC2" }
+      - targets: ["kamstrup-uc3.local:80"]
+        labels: { meter: "UC3" }
+      - targets: ["kamstrup-uc4.local:80"]
+        labels: { meter: "UC4" }
+      - targets: ["kamstrup-uc5.local:80"]
+        labels: { meter: "UC5" }

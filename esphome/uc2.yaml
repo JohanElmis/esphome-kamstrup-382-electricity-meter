@@ -1,0 +1,9 @@
+# Meter node UC2  -  ESP32 DevKit C V4
+substitutions:
+  node_name: kamstrup-uc2
+  friendly_name: "Kamstrup UC2"
+  meter_id: UC2
+
+packages:
+  board: !include common/board-esp32dev.yaml
+  base: !include common/kamstrup-base.yaml

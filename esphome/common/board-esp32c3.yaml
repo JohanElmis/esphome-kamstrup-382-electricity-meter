@@ -1,0 +1,17 @@
+# Board package: ESP32-C3 Super Mini.
+# Include this from a node file for meters on a C3 Super Mini.
+#
+# Logging/flashing use the native USB Serial/JTAG, so GPIO20/21 (UART0 pins)
+# are free for the meter UART. GPIO4 is a safe input; the strapping pins
+# 2/8/9 are avoided.
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+  variant: ESP32C3
+
+substitutions:
+  uart_rx_pin: GPIO20 # meter pin 2 "Data out" -> ESP RX
+  uart_tx_pin: GPIO21 # meter pin 5 "Data in"  <- ESP TX
+  pulse_pin: GPIO4 # meter pin 3 "Pulse out" (1000 imp/kWh)

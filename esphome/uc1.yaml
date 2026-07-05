@@ -1,0 +1,10 @@
+# Meter node UC1  -  ESP32 DevKit C V4
+# To move this meter to a C3 Super Mini, swap the board include below.
+substitutions:
+  node_name: kamstrup-uc1
+  friendly_name: "Kamstrup UC1"
+  meter_id: UC1
+
+packages:
+  board: !include common/board-esp32dev.yaml
+  base: !include common/kamstrup-base.yaml

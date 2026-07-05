@@ -1,0 +1,162 @@
+# =============================================================================
+# Kamstrup 382 meter node - reusable base package
+# =============================================================================
+# Included by each per-meter node file (uc1.yaml ... uc5.yaml) together with one
+# of the board packages (board-esp32dev.yaml / board-esp32c3.yaml).
+#
+# The node file must define:  node_name, friendly_name, meter_id
+# The board package defines:  uart_rx_pin, uart_tx_pin, pulse_pin
+#
+# Everything below can be overridden per node by re-declaring the substitution
+# in the node file (node-level substitutions win over package defaults).
+# =============================================================================
+
+substitutions:
+  # --- Serial (IEC 61107) read cadence ---
+  serial_read_interval: 5min
+  serial_response_timeout: 2s
+
+  # --- MQTT "publish on change" delta thresholds ---
+  delta_power: "0.1" # kW  - peak power / instantaneous power
+  delta_energy: "1" # kWh - energy + tariff registers
+  delta_hours: "1" # h   - hour counter
+
+  # --- Pulse input (meter pin 3, 1000 imp/kWh) ---
+  pulse_internal_filter: 50ms # debounce; plenty of margin at these pulse rates
+
+esphome:
+  name: ${node_name}
+  friendly_name: ${friendly_name}
+
+# No serial logging by default: baud_rate 0 disables the UART logger so it never
+# competes for pins. Logs are still available over the network and the web UI.
+logger:
+  baud_rate: 0
+  level: INFO
+
+# Home Assistant native API (auto-discovery). Key lives in secrets.yaml.
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Fallback hotspot if WiFi is unavailable, so the node is still reachable.
+  ap:
+    ssid: "${node_name} fallback"
+    password: !secret ap_password
+
+captive_portal:
+
+# Local dashboard with live values for this node.
+web_server:
+  version: 3
+  port: 80
+
+# Prometheus /metrics endpoint (scraped as its own target per meter).
+prometheus:
+
+# MQTT: publish on change (delta filters are set per sensor below).
+# Topics are auto-generated as: kamstrup/${meter_id}/<type>/<object_id>/state
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  topic_prefix: kamstrup/${meter_id}
+  discovery: false # HA is fed via the native API above, not MQTT discovery
+
+# The hand-written IEC 61107 parser (request/response + BCC validation).
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [iec61107]
+
+# -----------------------------------------------------------------------------
+# UART to the meter: 300 baud, 7 data bits, even parity, 1 stop bit.
+# -----------------------------------------------------------------------------
+uart:
+  id: meter_uart
+  rx_pin: ${uart_rx_pin} # <- meter pin 2 "Data out" (via optocoupler)
+  tx_pin: ${uart_tx_pin} # -> meter pin 5 "Data in"  (via optocoupler)
+  baud_rate: 300
+  data_bits: 7
+  parity: EVEN
+  stop_bits: 1
+
+# -----------------------------------------------------------------------------
+# Historical / cumulative data via IEC 61107.
+# -----------------------------------------------------------------------------
+iec61107:
+  id: meter
+  uart_id: meter_uart
+  update_interval: ${serial_read_interval}
+  response_timeout: ${serial_response_timeout}
+
+  type_number:
+    name: "Type number"
+  serial_number:
+    name: "Serial number"
+  energy:
+    name: "Energy register"
+    filters:
+      - delta: ${delta_energy}
+  tariff1:
+    name: "Tariff 1"
+    filters:
+      - delta: ${delta_energy}
+  tariff2:
+    name: "Tariff 2"
+    filters:
+      - delta: ${delta_energy}
+  hour_counter:
+    name: "Hour counter"
+    filters:
+      - delta: ${delta_hours}
+  pulse_input:
+    name: "Pulse input"
+  peak_power:
+    name: "Peak power"
+    filters:
+      - delta: ${delta_power}
+  last_month_peak:
+    name: "Last month peak"
+
+# -----------------------------------------------------------------------------
+# Instantaneous power + energy via the pulse output (meter pin 3, 1000 imp/kWh).
+# 1 pulse = 1/1000 kWh = 0.001 kWh.
+#   power (kW) = pulses/min * 0.001 kWh * 60 min/h = pulses/min * 0.06
+# -----------------------------------------------------------------------------
+sensor:
+  - platform: pulse_meter
+    id: instantaneous_power
+    name: "Instantaneous power"
+    pin:
+      number: ${pulse_pin}
+      mode:
+        input: true
+        pullup: true
+      # inverted: true   # enable if the optocoupler stage inverts the pulse
+    unit_of_measurement: "kW"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 3
+    internal_filter: ${pulse_internal_filter}
+    timeout: 5min # report 0 kW if no pulse for 5 min (low load)
+    filters:
+      - multiply: 0.06
+      - delta: ${delta_power}
+    total:
+      id: energy_pulse
+      name: "Energy (pulse)"
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      accuracy_decimals: 3
+      filters:
+        - multiply: 0.001

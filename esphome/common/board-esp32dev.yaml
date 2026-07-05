@@ -1,0 +1,15 @@
+# Board package: Espressif ESP32 DevKit C V4 (ESP32-WROOM-32).
+# Include this from a node file for meters on a DevKit C V4.
+#
+# Pin choices avoid the strapping pins (0, 2, 4*, 5, 12, 15) where possible.
+# UART2 defaults (16/17) are safe general-purpose IO; GPIO4 is fine as an input.
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+substitutions:
+  uart_rx_pin: GPIO16 # meter pin 2 "Data out" -> ESP RX
+  uart_tx_pin: GPIO17 # meter pin 5 "Data in"  <- ESP TX
+  pulse_pin: GPIO4 # meter pin 3 "Pulse out" (1000 imp/kWh)

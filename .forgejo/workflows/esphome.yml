@@ -1,0 +1,71 @@
+# Forgejo Actions CI for the Kamstrup ESPHome nodes.
+#
+# Lives in .forgejo/workflows/ so it runs on a Forgejo instance (GitHub Actions
+# ignores this path). Uses the official ESPHome container image, so no pip
+# install is needed. If your runner is not labelled `ubuntu-latest`, change the
+# two `runs-on:` lines. To track your local ESPHome version, bump the image tag
+# (or use `ghcr.io/esphome/esphome:stable`).
+
+name: ESPHome CI
+
+on:
+  push:
+    paths:
+      - "esphome/**"
+      - ".forgejo/workflows/**"
+  pull_request:
+    paths:
+      - "esphome/**"
+      - ".forgejo/workflows/**"
+
+concurrency:
+  group: esphome-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast YAML/schema/external-component check for every node.
+  validate:
+    runs-on: ubuntu-latest
+    container: ghcr.io/esphome/esphome:2026.6.4
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [uc1, uc2, uc3, uc4, uc5]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate CI secrets
+        run: python3 esphome/scripts/gen-ci-secrets.py
+      - name: Validate ${{ matrix.node }}
+        working-directory: esphome
+        run: esphome config ${{ matrix.node }}.yaml
+
+  # Full firmware build for one node per board type (the others are identical
+  # builds). Only runs if validation passed.
+  compile:
+    needs: validate
+    runs-on: ubuntu-latest
+    container: ghcr.io/esphome/esphome:2026.6.4
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node: uc1
+            board: ESP32 DevKit C V4
+          - node: uc3
+            board: ESP32-C3 Super Mini
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache PlatformIO toolchain & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            esphome/.esphome
+          key: pio-${{ matrix.node }}-${{ hashFiles(format('esphome/{0}.yaml', matrix.node), 'esphome/common/**', 'esphome/components/**') }}
+          restore-keys: |
+            pio-${{ matrix.node }}-
+      - name: Generate CI secrets
+        run: python3 esphome/scripts/gen-ci-secrets.py
+      - name: Compile ${{ matrix.node }} (${{ matrix.board }})
+        working-directory: esphome
+        run: esphome compile ${{ matrix.node }}.yaml

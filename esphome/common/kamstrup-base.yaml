@@ -13,8 +13,8 @@
 
 substitutions:
   # --- Serial (IEC 61107) read cadence ---
-  serial_read_interval: 5min
-  serial_response_timeout: 2s
+  serial_read_interval: 30s
+  serial_response_timeout: 2s # max silence, not total time (frame takes ~7 s)
 
   # --- MQTT "publish on change" delta thresholds ---
   delta_power: "0.1" # kW  - peak power / instantaneous power
@@ -61,21 +61,18 @@ web_server:
 # Prometheus /metrics endpoint (scraped as its own target per meter).
 prometheus:
 
-# MQTT: publish on change (delta filters are set per sensor below).
-# Topics are auto-generated as: kamstrup/${meter_id}/<type>/<object_id>/state
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  topic_prefix: kamstrup/${meter_id}
-  discovery: false # HA is fed via the native API above, not MQTT discovery
-
 # The hand-written IEC 61107 parser (request/response + BCC validation).
 external_components:
   - source:
       type: local
       path: components
     components: [iec61107]
+
+# Node connectivity: Home Assistant (API), MQTT (last will) and the web UI show
+# when the node comes online or drops off, without waiting for a meter poll.
+binary_sensor:
+  - platform: status
+    name: "Online"
 
 # -----------------------------------------------------------------------------
 # UART to the meter: 300 baud, 7 data bits, even parity, 1 stop bit.
@@ -98,6 +95,10 @@ iec61107:
   update_interval: ${serial_read_interval}
   response_timeout: ${serial_response_timeout}
 
+  # OFF after this many failed polls in a row (3 x 30 s = 90 s), ON after a good one.
+  failure_threshold: 3
+  readout_ok:
+    name: "Meter readout OK"
   type_number:
     name: "Type number"
   serial_number:

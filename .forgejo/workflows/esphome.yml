@@ -26,11 +26,11 @@ jobs:
   # Fast YAML/schema/external-component check for every node.
   validate:
     runs-on: ubuntu-latest
-    container: ghcr.io/esphome/esphome:2026.6.4
+    container: ghcr.io/esphome/esphome:2026.9.1
     strategy:
       fail-fast: false
       matrix:
-        node: [uc1, uc2, uc3, uc4, uc5]
+        node: [uc1, uc2, uc-nibe, uc4, uc5]
     steps:
       - uses: actions/checkout@v4
       - name: Generate CI secrets
@@ -44,14 +44,14 @@ jobs:
   compile:
     needs: validate
     runs-on: ubuntu-latest
-    container: ghcr.io/esphome/esphome:2026.6.4
+    container: ghcr.io/esphome/esphome:2026.9.1
     strategy:
       fail-fast: false
       matrix:
         include:
           - node: uc1
             board: ESP32 DevKit C V4
-          - node: uc3
+          - node: uc-nibe
             board: ESP32-C3 Super Mini
     steps:
       - uses: actions/checkout@v4

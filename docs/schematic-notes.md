@@ -19,8 +19,8 @@ The existing 2×EL817 isolation circuit (`docs/Kamstrup_Arduino_Isolated.drawio`
 ## Meter side (unchanged, sized to the 3.6V / 3 mA spec)
 
 - Pin 1: GND (meter reference)
-- Pin 2 "Data out"  → LED of the RX optocoupler, 680Ω series (meter → ESP)
-- Pin 3 "Pulse out" → LED of the pulse optocoupler, 680Ω series (meter → ESP)
+- Pin 2 "Data out"  → LED of the RX optocoupler, 820Ω series (meter → ESP)
+- Pin 3 "Pulse out" → LED of the pulse optocoupler, 820Ω series (meter → ESP)
 - Pin 5 "Data in"   ← driven from the ESP-side optocoupler (ESP → meter)
 - Keep meter-side series/pull resistors as in the existing schematic.
 
@@ -36,20 +36,16 @@ The existing 2×EL817 isolation circuit (`docs/Kamstrup_Arduino_Isolated.drawio`
 
 | Meter pin | Signal              | DevKit C V4 | C3 Super Mini |
 |-----------|---------------------|-------------|---------------|
-| 2         | Data out (→ ESP RX) | GPIO16      | GPIO20        |
-| 5         | Data in  (← ESP TX) | GPIO17      | GPIO21        |
+| 2         | Data out (→ ESP RX) | GPIO16      | GPIO5         |
+| 5         | Data in  (← ESP TX) | GPIO17      | GPIO6         |
 | 3         | Pulse out (→ ESP)   | GPIO4       | GPIO4         |
 
-## Signal polarity — verify on the bench
+## Signal polarity
 
-An optocoupler inverts by default (LED on → transistor pulls the collector
-**low**). Whether that matches what the UART and `pulse_meter` expect depends on
-the exact wiring of the existing circuit (pull-up vs pull-down on each stage).
+Both serial channels are **non-inverting** (idle high on both sides), so the
+UART needs no inversion. See `pcb-wiring.md` for the netlist and layout.
 
-- **Pulse:** if pulses don't register, set `inverted: true` on the `pulse_pin`
-  in `common/kamstrup-base.yaml` (the line is present, commented).
-- **UART RX:** if the readout returns garbage or nothing, the RX line is likely
-  inverted. Easiest fix is a small inverting transistor stage on the ESP side,
-  or wire the optocoupler so idle = mark (high). The original Arduino circuit
-  already produced correct serial, so replicating its RX stage on 3.3V should
-  work as-is; only the pull-up voltage/value changes.
+- **Pulse:** the schematic has no pulse channel. If the pulse comes from the S0
+  terminals, wire S0 `+` to the pulse GPIO and S0 `-` to ESP GND. If pulses don't
+  register, set `inverted: true` on the `pulse_pin` in `common/kamstrup-base.yaml`
+  (the line is present, commented).

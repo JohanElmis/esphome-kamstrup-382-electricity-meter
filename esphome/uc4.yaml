@@ -7,3 +7,4 @@ substitutions:
 packages:
   board: !include common/board-esp32c3.yaml
   base: !include common/kamstrup-base.yaml
+  mqtt: !include common/mqtt.yaml

@@ -98,7 +98,7 @@ A full sample response is included in the Kamstrup spec (type number `685-382-OK
 - `uart` component: 300 baud, 7 data bits, even parity, 1 stop bit
 - Custom component (C++/lambda) that:
   1. Sends `/?!\r\n`
-  2. Buffers incoming data until `[ETX]` + BCC has been received (with a timeout, e.g. 1–2 s)
+  2. Buffers incoming data until `[ETX]` + BCC has been received (a frame takes ~7 s at 300 baud, so time out on 1–2 s of silence, not on total time)
   3. Validates the BCC
   4. Parses out the OBIS fields above using simple string splitting/regex
   5. Exposes each field as an ESPHome `sensor`/`text_sensor`

@@ -40,7 +40,7 @@ void IEC61107Component::send_request_() {
   this->write_str("/?!\r\n");
   this->flush();
 
-  this->request_time_ = millis();
+  this->last_rx_time_ = millis();
   this->state_ = State::WAITING;
   ESP_LOGD(TAG, "Sent readout request '/?!'");
 }
@@ -54,10 +54,12 @@ void IEC61107Component::loop() {
     if (!this->read_byte(&c))
       break;
     this->buffer_.push_back(static_cast<char>(c));
+    this->last_rx_time_ = millis();
 
     if (this->buffer_.size() > MAX_FRAME) {
       ESP_LOGW(TAG, "Response exceeded %d bytes without [ETX], discarding", (int) MAX_FRAME);
       this->state_ = State::IDLE;
+      this->record_result_(false);
       return;
     }
   }
@@ -65,23 +67,41 @@ void IEC61107Component::loop() {
   // A frame is complete once we have received [ETX] plus the trailing BCC byte.
   size_t etx_pos = this->buffer_.find(ETX);
   if (etx_pos != std::string::npos && this->buffer_.size() >= etx_pos + 2) {
-    this->process_frame_();
+    bool ok = this->process_frame_();
     this->state_ = State::IDLE;
+    this->record_result_(ok);
     return;
   }
 
-  if (millis() - this->request_time_ > this->timeout_ms_) {
-    ESP_LOGW(TAG, "Timeout waiting for meter response (%d bytes received)", (int) this->buffer_.size());
+  // At 300 baud a full frame takes several seconds, so time out on silence,
+  // not on total time.
+  if (millis() - this->last_rx_time_ > this->timeout_ms_) {
+    ESP_LOGW(TAG, "Meter went silent (%d bytes received)", (int) this->buffer_.size());
     this->state_ = State::IDLE;
+    this->record_result_(false);
   }
 }
 
-void IEC61107Component::process_frame_() {
+// ON after a good frame; OFF after failure_threshold_ failed polls in a row.
+void IEC61107Component::record_result_(bool ok) {
+  if (ok) {
+    this->failures_ = 0;
+    if (this->readout_ok_sensor_ != nullptr)
+      this->readout_ok_sensor_->publish_state(true);
+    return;
+  }
+  if (this->failures_ < 255)
+    this->failures_++;
+  if (this->failures_ >= this->failure_threshold_ && this->readout_ok_sensor_ != nullptr)
+    this->readout_ok_sensor_->publish_state(false);
+}
+
+bool IEC61107Component::process_frame_() {
   size_t stx_pos = this->buffer_.find(STX);
   size_t etx_pos = this->buffer_.find(ETX);
   if (stx_pos == std::string::npos || etx_pos == std::string::npos || etx_pos < stx_pos) {
     ESP_LOGW(TAG, "Malformed frame (missing STX/ETX)");
-    return;
+    return false;
   }
 
   const uint8_t received_bcc = static_cast<uint8_t>(this->buffer_[etx_pos + 1]) & 0x7F;
@@ -94,7 +114,7 @@ void IEC61107Component::process_frame_() {
 
   if (sum != received_bcc) {
     ESP_LOGW(TAG, "BCC mismatch: computed 0x%02X, received 0x%02X - dropping frame", sum, received_bcc);
-    return;
+    return false;
   }
   ESP_LOGD(TAG, "BCC OK (0x%02X)", sum);
 
@@ -130,6 +150,7 @@ void IEC61107Component::process_frame_() {
     if (pos < this->buffer_.size() && this->buffer_[pos] == LF)
       pos++;
   }
+  return true;
 }
 
 bool IEC61107Component::parse_line_(const std::string &line) {

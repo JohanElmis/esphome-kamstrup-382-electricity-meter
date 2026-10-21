@@ -1,0 +1,16 @@
+# =============================================================================
+# Optional MQTT package. Include it from a node file that should publish to MQTT:
+#   packages:
+#     mqtt: !include common/mqtt.yaml
+# Needs mqtt_broker, mqtt_username and mqtt_password in secrets.yaml.
+# Nodes without it skip MQTT (Home Assistant API, web and Prometheus still work).
+# =============================================================================
+
+# MQTT: publish on change (delta filters are set per sensor below).
+# Topics are auto-generated as: kamstrup/${meter_id}/<type>/<object_id>/state
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  topic_prefix: kamstrup/${meter_id}
+  discovery: false # HA is fed via the native API above, not MQTT discovery

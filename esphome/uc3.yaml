@@ -1,9 +1,0 @@
-# Meter node UC3  -  ESP32-C3 Super Mini
-substitutions:
-  node_name: kamstrup-uc3
-  friendly_name: "Kamstrup UC3"
-  meter_id: UC3
-
-packages:
-  board: !include common/board-esp32c3.yaml
-  base: !include common/kamstrup-base.yaml

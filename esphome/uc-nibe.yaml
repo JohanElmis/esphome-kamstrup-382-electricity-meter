@@ -1,0 +1,9 @@
+# Meter node Nibe heat pump  -  ESP32-C3 Super Mini
+substitutions:
+  node_name: kamstrup-nibe
+  friendly_name: "Kamstrup Nibe Heatpump"
+  meter_id: UC_nibe
+
+packages:
+  board: !include common/board-esp32c3.yaml
+  base: !include common/kamstrup-base.yaml

@@ -2,9 +2,10 @@
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, text_sensor, uart
+from esphome.components import binary_sensor, sensor, text_sensor, uart
 from esphome.const import (
     CONF_ID,
+    DEVICE_CLASS_CONNECTIVITY,
     DEVICE_CLASS_ENERGY,
     DEVICE_CLASS_POWER,
     STATE_CLASS_MEASUREMENT,
@@ -16,7 +17,7 @@ from esphome.const import (
 
 CODEOWNERS = ["@johanelmis"]
 DEPENDENCIES = ["uart"]
-AUTO_LOAD = ["sensor", "text_sensor"]
+AUTO_LOAD = ["binary_sensor", "sensor", "text_sensor"]
 
 iec61107_ns = cg.esphome_ns.namespace("iec61107")
 IEC61107Component = iec61107_ns.class_(
@@ -24,6 +25,8 @@ IEC61107Component = iec61107_ns.class_(
 )
 
 CONF_RESPONSE_TIMEOUT = "response_timeout"
+CONF_FAILURE_THRESHOLD = "failure_threshold"
+CONF_READOUT_OK = "readout_ok"
 CONF_TYPE_NUMBER = "type_number"
 CONF_SERIAL_NUMBER = "serial_number"
 CONF_ENERGY = "energy"
@@ -57,6 +60,10 @@ CONFIG_SCHEMA = (
             cv.Optional(
                 CONF_RESPONSE_TIMEOUT, default="2s"
             ): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_FAILURE_THRESHOLD, default=3): cv.int_range(min=1, max=255),
+            cv.Optional(CONF_READOUT_OK): binary_sensor.binary_sensor_schema(
+                device_class=DEVICE_CLASS_CONNECTIVITY,
+            ),
             cv.Optional(CONF_TYPE_NUMBER): text_sensor.text_sensor_schema(),
             cv.Optional(CONF_SERIAL_NUMBER): text_sensor.text_sensor_schema(),
             cv.Optional(CONF_ENERGY): _energy_schema,
@@ -88,6 +95,10 @@ async def to_code(config):
     await uart.register_uart_device(var, config)
 
     cg.add(var.set_response_timeout(config[CONF_RESPONSE_TIMEOUT]))
+
+    cg.add(var.set_failure_threshold(config[CONF_FAILURE_THRESHOLD]))
+    if CONF_READOUT_OK in config:
+        cg.add(var.set_readout_ok_sensor(await binary_sensor.new_binary_sensor(config[CONF_READOUT_OK])))
 
     if CONF_TYPE_NUMBER in config:
         cg.add(var.set_type_number_sensor(await text_sensor.new_text_sensor(config[CONF_TYPE_NUMBER])))

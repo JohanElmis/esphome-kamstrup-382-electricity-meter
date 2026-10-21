@@ -2,6 +2,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/uart/uart.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 
@@ -13,7 +14,8 @@ namespace iec61107 {
 // Kamstrup 382 IEC 61107 mode A readout.
 //
 // On each poll the component sends the readout request "/?!\r\n", buffers the
-// response until [ETX] + BCC has been received (or a timeout elapses),
+// response until [ETX] + BCC has been received (or the meter is silent for
+// the response timeout; a frame takes seconds at 300 baud),
 // validates the block check character, and publishes the OBIS fields.
 class IEC61107Component : public PollingComponent, public uart::UARTDevice {
  public:
@@ -25,6 +27,8 @@ class IEC61107Component : public PollingComponent, public uart::UARTDevice {
 
   void set_response_timeout(uint32_t timeout_ms) { this->timeout_ms_ = timeout_ms; }
 
+  void set_failure_threshold(uint8_t n) { this->failure_threshold_ = n; }
+  void set_readout_ok_sensor(binary_sensor::BinarySensor *s) { this->readout_ok_sensor_ = s; }
   void set_type_number_sensor(text_sensor::TextSensor *s) { this->type_number_sensor_ = s; }
   void set_serial_number_sensor(text_sensor::TextSensor *s) { this->serial_number_sensor_ = s; }
   void set_energy_sensor(sensor::Sensor *s) { this->energy_sensor_ = s; }
@@ -39,15 +43,19 @@ class IEC61107Component : public PollingComponent, public uart::UARTDevice {
   enum class State { IDLE, WAITING };
 
   void send_request_();
-  void process_frame_();
+  bool process_frame_();
+  void record_result_(bool ok);
   bool parse_line_(const std::string &line);
   void publish_number_(sensor::Sensor *s, const std::string &value);
 
   State state_{State::IDLE};
   std::string buffer_;
-  uint32_t request_time_{0};
+  uint32_t last_rx_time_{0};
   uint32_t timeout_ms_{2000};
+  uint8_t failure_threshold_{3};
+  uint8_t failures_{0};
 
+  binary_sensor::BinarySensor *readout_ok_sensor_{nullptr};
   text_sensor::TextSensor *type_number_sensor_{nullptr};
   text_sensor::TextSensor *serial_number_sensor_{nullptr};
   sensor::Sensor *energy_sensor_{nullptr};

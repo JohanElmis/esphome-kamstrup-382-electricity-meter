@@ -14,8 +14,8 @@ scrape_configs:
         labels: { meter: "UC1" }
       - targets: ["kamstrup-uc2.local:80"]
         labels: { meter: "UC2" }
-      - targets: ["kamstrup-uc3.local:80"]
-        labels: { meter: "UC3" }
+      - targets: ["kamstrup-nibe.local:80"]
+        labels: { meter: "UC_nibe" }
       - targets: ["kamstrup-uc4.local:80"]
         labels: { meter: "UC4" }
       - targets: ["kamstrup-uc5.local:80"]
